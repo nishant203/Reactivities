@@ -3,16 +3,39 @@ import { createContext, SyntheticEvent } from "react";
 import { IActivity } from "../models/activity";
 import agent from "../api/agent";
 
-configure({ enforceActions: 'always' });
+configure({ enforceActions: "always" });
 
 class ActivityStore {
-  @observable activities: IActivity[] = [];
   @observable loadingInitial = false;
   @observable acitivityRegistry = new Map();
-  @observable editMode = false;
   @observable submitting = false;
   @observable target = "";
-  @observable selectedActivity: IActivity | undefined;
+  @observable activity: IActivity | null=null;
+
+  @action loadActivity = async (id: string) => {
+    let activity = this.getActivity(id);
+    if (activity) {
+      this.activity = activity;
+    } else {
+      this.loadingInitial = true;
+      try {
+        activity = await agent.Activities.details(id);
+        runInAction("gettting acitivity", () => {
+          this.activity = activity;
+          this.loadingInitial = false;
+        });
+      } catch (error) {
+        runInAction("error gettting acitivity", () => {
+          this.loadingInitial = false;
+        });
+        console.log(error);
+      }
+    }
+  };
+
+  getActivity(id: string) {
+    return this.acitivityRegistry.get(id);
+  }
   @action loadActivities = async () => {
     this.loadingInitial = true;
     try {
@@ -30,14 +53,15 @@ class ActivityStore {
       });
     }
   };
-
+  @action clearActivity = () => {
+    this.activity = null;
+  };
   @action createActivity = async (activity: IActivity) => {
     this.submitting = true;
     try {
       await agent.Activities.create(activity);
       runInAction("creating activity", () => {
         this.acitivityRegistry.set(activity.id, activity);
-        this.editMode = false;
         this.submitting = false;
       });
     } catch (error) {
@@ -54,8 +78,7 @@ class ActivityStore {
       await agent.Activities.update(activity);
       runInAction("edit activity", () => {
         this.acitivityRegistry.set(activity.id, activity);
-        this.selectedActivity = activity;
-        this.editMode = false;
+        this.activity = activity;
         this.submitting = false;
       });
     } catch (error) {
@@ -84,29 +107,10 @@ class ActivityStore {
       });
     }
   };
-  @action selectActivity = (id: string) => {
-    debugger;
-    this.selectedActivity = this.acitivityRegistry.get(id);
-    this.editMode = false;
-  };
   @computed get activitiesByDate() {
     return Array.from(this.acitivityRegistry.values()).sort(
       (a, b) => Date.parse(a.date) - Date.parse(b.date)
     );
   }
-  @action openCreateForm = () => {
-    this.editMode = true;
-    this.selectedActivity = undefined;
-  };
-  @action openEditForm = (id: string) => {
-    this.selectedActivity = this.acitivityRegistry.get(id);
-    this.editMode = true;
-  };
-  @action cancelSelectedActivity = () => {
-    this.selectedActivity = undefined;
-  };
-  @action cancelFormOpen = () => {
-    this.editMode = false;
-  };
 }
 export default createContext(new ActivityStore());
