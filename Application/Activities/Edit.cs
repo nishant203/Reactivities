@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using FluentValidation;
 using MediatR;
 using Persistence;
 
@@ -26,20 +27,31 @@ namespace Application.Activities
             {
                 _context = context;
             }
-
-           public async Task<Unit> Handle(Command request, CancellationToken cancellationToken)
+            public class CommandValidator : AbstractValidator<Command>
             {
-                var activity = await _context.Activities.FindAsync(request.Id);    
+                public CommandValidator()
+                {
+                    RuleFor(x => x.Title).NotEmpty();
+                    RuleFor(x => x.Description).NotEmpty();
+                    RuleFor(x => x.Date).NotEmpty();
+                    RuleFor(x => x.Category).NotEmpty();
+                    RuleFor(x => x.City).NotEmpty();
+                    RuleFor(x => x.Title).NotEmpty();
+                }
+            }
+            public async Task<Unit> Handle(Command request, CancellationToken cancellationToken)
+            {
+                var activity = await _context.Activities.FindAsync(request.Id);
 
                 if (activity == null)
                     throw new Exception("Could not find activity");
 
-                activity.Title = request.Title ?? activity.Title;            
-                activity.Description = request.Description ?? activity.Description;            
-                activity.Category = request.Category ?? activity.Category;            
-                activity.Date = request.Date ?? activity.Date;            
-                activity.City = request.City ?? activity.City;            
-                activity.Venue = request.Venue ?? activity.Venue;            
+                activity.Title = request.Title ?? activity.Title;
+                activity.Description = request.Description ?? activity.Description;
+                activity.Category = request.Category ?? activity.Category;
+                activity.Date = request.Date ?? activity.Date;
+                activity.City = request.City ?? activity.City;
+                activity.Venue = request.Venue ?? activity.Venue;
 
                 var success = await _context.SaveChangesAsync() > 0;
 
