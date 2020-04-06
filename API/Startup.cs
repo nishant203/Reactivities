@@ -16,16 +16,27 @@ using Microsoft.Extensions.Logging;
 using Persistence;
 using FluentValidation.AspNetCore;
 using API.Middleware;
+using Domain;
+using Microsoft.AspNetCore.Identity;
+using Infrastructure.Security;
+using Application.Interfaces;
+using System.Text;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.Authorization;
 
 namespace API
 {
     public class Startup
     {
+
+
         public Startup(IConfiguration configuration)
         {
-            Configuration = configuration;
-        }
+            this.Configuration = configuration;
 
+        }
         public IConfiguration Configuration { get; }
 
         // This method gets called by the runtime. Use this method to add services to the container.
@@ -43,9 +54,31 @@ namespace API
                 });
             });
             services.AddMediatR(typeof(List.Handler).Assembly);
-            services.AddControllers().AddFluentValidation(cfg=>{
+            services.AddControllers(opt =>
+            {
+                var policy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+                opt.Filters.Add(new AuthorizeFilter(policy));
+            }).AddFluentValidation(cfg =>
+            {
                 cfg.RegisterValidatorsFromAssemblyContaining<Create>();
             });
+            var builder = services.AddIdentityCore<AppUser>();
+            var identityBuilder = new IdentityBuilder(builder.UserType, builder.Services);
+            identityBuilder.AddEntityFrameworkStores<DataContext>();
+            identityBuilder.AddSignInManager<SignInManager<AppUser>>();
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Configuration["cceb6082-07ac-4202-8fef-4a4717217b00"]));
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(opt =>
+            {
+                opt.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = key,
+                    ValidateAudience = false,
+                    ValidateIssuer = false
+                };
+            });
+            services.AddScoped<IJwtGenerator, JwtGenerator>();
+            services.AddScoped<IUserAccessor, UserAccessor>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -60,10 +93,11 @@ namespace API
             // app.UseHttpsRedirection();
 
             app.UseRouting();
-
+            app.UseCors("CorsPolicy");
+            app.UseAuthentication();
             app.UseAuthorization();
 
-            app.UseCors("CorsPolicy");
+
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();
