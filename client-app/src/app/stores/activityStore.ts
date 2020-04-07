@@ -1,34 +1,42 @@
-import { observable, action, computed, configure, runInAction } from "mobx";
-import { createContext, SyntheticEvent } from "react";
+import { observable, action, computed, runInAction } from "mobx";
+import { SyntheticEvent } from "react";
 import { IActivity } from "../models/activity";
 import agent from "../api/agent";
-import { history } from '../..';
-configure({ enforceActions: "always" });
+import { history } from "../..";
+import { RootStore } from "./rootStore";
 
-class ActivityStore {
+
+export default class ActivityStore {
+  rootStore: RootStore;
+  constructor(rootStore: RootStore) {
+    this.rootStore = rootStore;
+  }
   @observable loadingInitial = false;
   @observable activityRegistry = new Map();
   @observable submitting = false;
   @observable target = "";
-  @observable activity: IActivity | null=null;
-
+  @observable activity: IActivity | null = null;
 
   @computed get activitiesByDate() {
-    return this.groupActivitiesByDate(Array.from(this.activityRegistry.values()))
+    return this.groupActivitiesByDate(
+      Array.from(this.activityRegistry.values())
+    );
   }
 
   groupActivitiesByDate(activities: IActivity[]) {
     const sortedActivities = activities.sort(
-      (a, b) => a.date.getTime() -b.date.getTime()
-    )
-    return Object.entries(sortedActivities.reduce((activities, activity) => {
-      const date = activity.date!.toISOString().split('T')[0];
-      activities[date] = activities[date] ? [...activities[date], activity] : [activity];
-      return activities;
-    }, {} as {[key: string]: IActivity[]}));
+      (a, b) => a.date.getTime() - b.date.getTime()
+    );
+    return Object.entries(
+      sortedActivities.reduce((activities, activity) => {
+        const date = activity.date!.toISOString().split("T")[0];
+        activities[date] = activities[date]
+          ? [...activities[date], activity]
+          : [activity];
+        return activities;
+      }, {} as { [key: string]: IActivity[] })
+    );
   }
-
-
 
   @action loadActivity = async (id: string) => {
     let activity = this.getActivity(id);
@@ -64,7 +72,7 @@ class ActivityStore {
       const activities = await agent.Activities.list();
       runInAction("loading activities", () => {
         activities.forEach(activity => {
-          activity.date = new Date(activity.date)
+          activity.date = new Date(activity.date);
           this.activityRegistry.set(activity.id, activity);
         });
         this.loadingInitial = false;
@@ -131,6 +139,4 @@ class ActivityStore {
       });
     }
   };
- 
 }
-export default createContext(new ActivityStore());
