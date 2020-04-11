@@ -1,9 +1,11 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Application.Interfaces;
 using Domain;
 using FluentValidation;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using Persistence;
 
 namespace Application.Activities
@@ -25,21 +27,23 @@ namespace Application.Activities
         {
             public CommandValidator()
             {
-                RuleFor(x=>x.Title).NotEmpty();
-                RuleFor(x=>x.Description).NotEmpty();
-                RuleFor(x=>x.Date).NotEmpty();
-                RuleFor(x=>x.Category).NotEmpty();
-                RuleFor(x=>x.City).NotEmpty();
-                RuleFor(x=>x.Title).NotEmpty();
+                RuleFor(x => x.Title).NotEmpty();
+                RuleFor(x => x.Description).NotEmpty();
+                RuleFor(x => x.Date).NotEmpty();
+                RuleFor(x => x.Category).NotEmpty();
+                RuleFor(x => x.City).NotEmpty();
+                RuleFor(x => x.Title).NotEmpty();
             }
         }
 
         public class Handler : IRequestHandler<Command>
         {
             private readonly DataContext _context;
+            private readonly IUserAccessor _userAccessor;
 
-            public Handler(DataContext context)
+            public Handler(DataContext context, IUserAccessor userAccessor)
             {
+                _userAccessor = userAccessor;
                 _context = context;
             }
 
@@ -57,8 +61,18 @@ namespace Application.Activities
                 };
 
                 _context.Activities.Add(activity);
+                var user = await _context.Users.SingleOrDefaultAsync(x => x.UserName == _userAccessor.GetCurrentUsername());
+                var attendee = new UserActivity
+                {
+                    AppUser = user,
+                    Activity = activity,
+                    IsHost = true,
+                    DateJoined = DateTime.Now
+                };
+
+                _context.userActivities.Add(attendee);
                 var success = await _context.SaveChangesAsync() > 0;
-                if(success) return Unit.Value;
+                if (success) return Unit.Value;
                 throw new Exception("Something went wrong");
             }
         }
