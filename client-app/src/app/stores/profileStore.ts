@@ -12,6 +12,7 @@ export default class ProfileStore {
   @observable loadingProfile = true;
   @observable uploadingPhoto = false;
   @observable loading = false;
+  @observable submitting = false;
   @computed get isCurrentUser() {
     if (this.rootStore.userStore.user && this.profile) {
       return this.rootStore.userStore.user.username === this.profile.username;
@@ -90,6 +91,24 @@ export default class ProfileStore {
         this.loading = false;
       });
       console.log(error.response);
+    }
+  };
+  @action editProfile = async (profile: Partial<IProfile>) => {
+    this.submitting = true;
+    try {
+      await agent.Profiles.editProfile(profile);
+      runInAction("editing profile", () => {
+        if(profile.displayName!== this.rootStore.userStore.user!.displayName){
+          this.rootStore.userStore.user!.displayName =profile.displayName!;
+        }
+        this.submitting = false;
+        this.profile= {...this.profile!, ...profile}
+      });
+    } catch (error) {
+      runInAction("edit profile error", () => {
+        this.submitting = false;
+      });
+      throw error;
     }
   };
 }
